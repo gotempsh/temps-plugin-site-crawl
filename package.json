@@ -48,6 +48,13 @@
     "platforms": [
       "darwin-arm64",
       "linux-amd64-gnu"
+    ],
+    "permissions": [
+      {
+        "permission": "events_read",
+        "required": false,
+        "reason": "Enables automatic crawls after successful deployments. Manual crawls work without this permission."
+      }
     ]
   },
   "overrides": {
