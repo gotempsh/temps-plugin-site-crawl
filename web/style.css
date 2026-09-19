@@ -56,3 +56,15 @@
     transition: none !important;
   }
 }
+
+html, body, #root { height: 100%; }
+.plugin-shell { display: grid; grid-template-columns: 11rem minmax(0, 1fr); height: 100dvh; overflow: hidden; }
+.plugin-sidebar { display: flex; flex-direction: column; gap: .375rem; padding: 1rem .75rem; border-right: 1px solid var(--border); background: var(--muted); }
+.plugin-content { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 1rem 1.25rem; gap: 1rem; }
+.plugin-workspace { min-height: 0; overflow: auto; flex: 1; }
+@media (max-width: 640px) {
+ .plugin-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+ .plugin-sidebar { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: .5rem; }
+ .plugin-sidebar button { flex-shrink: 0; }
+ .plugin-content { padding: .75rem; }
+}

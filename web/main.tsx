@@ -13,11 +13,16 @@ import {
   ScanSearch,
   RefreshCw,
   Download,
-  Moon,
-  Sun,
+  ArrowLeft,
+  ArrowUpRight,
+  ListChecks,
+  Plus,
+  Trash2,
+  CircleStop,
   Settings2,
 } from "lucide-react";
-import { PageContainer, PageHeader } from "./vendor/ds/page-header";
+import { ResponsivePagination } from "./vendor/ds/responsive-pagination";
+import { paginate } from "../src/pagination";
 import { Button } from "./vendor/ds/button";
 import { Field } from "./vendor/ds/field";
 import { Callout } from "./vendor/ds/callout";
@@ -34,8 +39,6 @@ import {
   TableHead,
   TableCell,
   Tabs,
-  TabsList,
-  TabsTrigger,
   TabsContent,
   AlertDialog,
   AlertDialogContent,
@@ -106,8 +109,18 @@ function Section({
 }
 function App() {
   const cache = useQueryClient();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [tab, setTab] = useState("reports");
+  const [route, setRoute] = useState(() => location.hash.replace(/^#\/?/, "") || "reports");
+  useEffect(() => {
+    const changed = () => setRoute(location.hash.replace(/^#\/?/, "") || "reports");
+    window.addEventListener("hashchange", changed);
+    return () => window.removeEventListener("hashchange", changed);
+  }, []);
+  const navigate = (path: string) => { location.hash = `/${path}`; };
+  const selected = route.startsWith("reports/") ? route.slice(8) : null;
+  const tab = route === "automation" ? "automation" : route === "new" ? "new" : "reports";
+  const setSelected = (id: string | null) => navigate(id ? `reports/${id}` : "reports");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [resultPage, setResultPage] = useState(1);
   const [filter, setFilter] = useState("all");
   const [url, setUrl] = useState("");
   const [limit, setLimit] = useState(100);
@@ -115,23 +128,21 @@ function App() {
   const [confirmation, setConfirmation] = useState<"delete" | "queue" | null>(
     null,
   );
-  const [dark, setDark] = useState(() => {
-    try {
-      return (
-        localStorage.getItem("site-crawl-theme") === "dark" ||
-        (!localStorage.getItem("site-crawl-theme") &&
-          matchMedia("(prefers-color-scheme: dark)").matches)
-      );
-    } catch {
-      return false;
-    }
-  });
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    try {
-      localStorage.setItem("site-crawl-theme", dark ? "dark" : "light");
-    } catch {}
-  }, [dark]);
+    const system = matchMedia("(prefers-color-scheme: dark)");
+    let host: HTMLElement | undefined;
+    try { if (window.parent !== window) host = window.parent.document.documentElement; } catch { /* standalone fallback */ }
+    const sync = () => {
+      const dark = host ? host.classList.contains("dark") : system.matches;
+      document.documentElement.classList.toggle("dark", dark);
+      document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    };
+    const observer = new MutationObserver(sync);
+    if (host) observer.observe(host, { attributes: true, attributeFilter: ["class"] });
+    system.addEventListener("change", sync);
+    sync();
+    return () => { observer.disconnect(); system.removeEventListener("change", sync); };
+  }, []);
   const reports = useQuery({
     queryKey: ["reports"],
     queryFn: () => api<Summary[]>("/reports"),
@@ -142,10 +153,10 @@ function App() {
     queryFn: () => api<Automation>("/automation"),
     refetchInterval: 15000,
   });
-  const id = selected ?? reports.data?.[0]?.id;
+  const id = selected;
   const report = useQuery({
     queryKey: ["report", id],
-    queryFn: () => api<Report>(`/reports/${id}`),
+    queryFn: () => api<Report>(`/reports/${encodeURIComponent(id!)}`),
     enabled: !!id,
     refetchInterval: (q) => (q.state.data?.state === "running" ? 1500 : false),
   });
@@ -155,7 +166,7 @@ function App() {
       api<{ id: string }>("/reports", "POST", { url, maxPages: limit }),
     onSuccess: (r) => {
       setSelected(r.id);
-      setTab("reports");
+      setResultPage(1);
       void refresh();
     },
   });
@@ -193,28 +204,24 @@ function App() {
     r?.pages.filter(
       (p) => filter === "all" || p.issues.some((i) => i.severity === filter),
     ) ?? [];
+  const history = paginate(reports.data ?? [], historyPage, 8);
+  const results = paginate(pages, resultPage, 8);
   return (
-    <PageContainer>
-      <PageHeader
-        title="Site Crawl"
-        description="Find broken routes and technical SEO issues after every deployment."
-        actions={
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={dark ? "Use light theme" : "Use dark theme"}
-              onClick={() => setDark(!dark)}
-            >
-              {dark ? <Sun /> : <Moon />}
-            </Button>
-            <Button variant="outline" onClick={() => void refresh()}>
-              <RefreshCw />
-              Refresh
-            </Button>
-          </>
-        }
-      />
+    <div className="plugin-shell">
+      <nav className="plugin-sidebar" aria-label="Site Crawl navigation">
+        <Button variant={tab === "reports" ? "secondary" : "ghost"} className="justify-start" onClick={() => navigate("reports")}><ListChecks /> Crawl reports</Button>
+        <Button variant={tab === "new" ? "secondary" : "ghost"} className="justify-start" onClick={() => navigate("new")}><Plus /> New crawl</Button>
+        <Button variant={tab === "automation" ? "secondary" : "ghost"} className="justify-start" onClick={() => navigate("automation")}><Settings2 /> Automation</Button>
+      </nav>
+      <main className="plugin-content">
+        <header className="flex shrink-0 items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            {selected && <Button variant="ghost" size="icon" aria-label="Back to crawl reports" onClick={() => navigate("reports")}><ArrowLeft /></Button>}
+            <h1 className="text-lg font-semibold">{selected ? "Crawl details" : tab === "new" ? "New crawl" : tab === "automation" ? "Deployment automation" : "Crawl reports"}</h1>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => void refresh()}><RefreshCw /> Refresh</Button>
+        </header>
+        <div className="plugin-workspace">
       {errors.length > 0 && (
         <Callout tone="error" title="Could not complete the request">
           {errors.map((e, i) => (
@@ -225,7 +232,7 @@ function App() {
           </Button>
         </Callout>
       )}
-      <Section title="New crawl">
+      {tab === "new" && <Section title="Crawl a website">
         <form
           className="grid items-end gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"
           onSubmit={(e) => {
@@ -278,17 +285,10 @@ function App() {
             before starting another.
           </p>
         )}
-      </Section>
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="reports">Crawl reports</TabsTrigger>
-          <TabsTrigger value="automation">
-            <Settings2 className="mr-2 size-4" />
-            Deployment automation
-          </TabsTrigger>
-        </TabsList>
+      </Section>}
+      <Tabs value={tab}>
         <TabsContent value="reports" className="space-y-6">
-          <Section title="Recent crawls">
+          <>{!selected && <Section title="Crawl history" actions={<Button size="sm" onClick={() => navigate("new")}><Plus /> New crawl</Button>}>
             {reports.isPending ? (
               <p role="status" className="text-sm text-muted-foreground">
                 Loading reports…
@@ -312,7 +312,7 @@ function App() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reports.data.map((item) => (
+                  {history.items.map((item) => (
                     <TableRow
                       key={item.id}
                       data-state={id === item.id ? "selected" : undefined}
@@ -320,9 +320,9 @@ function App() {
                       <TableCell>
                         <button
                           className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-ring"
-                          onClick={() => setSelected(item.id)}
+                          onClick={() => { setResultPage(1); setSelected(item.id); }}
                         >
-                          {new URL(item.url).hostname}
+                          {new URL(item.url).hostname} <ArrowUpRight className="ml-1 inline size-3.5" />
                         </button>
                         {item.trigger && (
                           <p className="text-xs text-muted-foreground">
@@ -343,8 +343,10 @@ function App() {
                 </TableBody>
               </Table>
             )}
-          </Section>
-          {r && (
+            {!!reports.data?.length && <ResponsivePagination className="mt-4 border-t pt-3" ariaLabel="Crawl history pagination" page={history.page} pageSize={8} total={reports.data.length} totalPages={history.totalPages} onPageChange={setHistoryPage} />}
+          </Section>}</>
+          {selected && report.isPending && <p role="status">Loading crawl details…</p>}
+          {selected && r && (
             <Section
               title={new URL(r.url).hostname}
               actions={
@@ -367,7 +369,7 @@ function App() {
                         })
                       }
                     >
-                      Cancel crawl
+                      <CircleStop /> Cancel crawl
                     </Button>
                   ) : (
                     <Button
@@ -375,7 +377,7 @@ function App() {
                       size="sm"
                       onClick={() => setConfirmation("delete")}
                     >
-                      Delete report
+                      <Trash2 /> Delete report
                     </Button>
                   )}
                 </>
@@ -443,7 +445,7 @@ function App() {
                       size="sm"
                       variant={filter === value ? "secondary" : "ghost"}
                       aria-pressed={filter === value}
-                      onClick={() => setFilter(value!)}
+                      onClick={() => { setFilter(value!); setResultPage(1); }}
                     >
                       {label}
                     </Button>
@@ -457,7 +459,7 @@ function App() {
                   </p>
                 ) : (
                   <div className="divide-y rounded-md border">
-                    {pages.map((page) => (
+                    {results.items.map((page) => (
                       <details key={page.url} className="group">
                         <summary className="flex cursor-pointer items-start gap-3 p-3 text-sm focus-visible:outline-ring">
                           <Status
@@ -483,7 +485,7 @@ function App() {
                             {page.issues.length} issues
                           </span>
                         </summary>
-                        <div className="space-y-3 border-t bg-muted/20 p-4 text-sm">
+                        <div className="max-h-72 space-y-3 overflow-y-auto border-t bg-muted/20 p-4 text-sm">
                           {page.title && (
                             <p className="font-medium">{page.title}</p>
                           )}
@@ -524,6 +526,7 @@ function App() {
                     ))}
                   </div>
                 )}
+                {!!pages.length && <ResponsivePagination ariaLabel="Crawl URLs pagination" page={results.page} pageSize={8} total={pages.length} totalPages={results.totalPages} onPageChange={setResultPage} />}
               </div>
             </Section>
           )}
@@ -683,6 +686,8 @@ function App() {
           </Section>
         </TabsContent>
       </Tabs>
+      </div>
+      </main>
       <AlertDialog
         open={confirmation !== null}
         onOpenChange={(open) => {
@@ -729,7 +734,7 @@ function App() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </PageContainer>
+    </div>
   );
 }
 createRoot(document.getElementById("root")!).render(
