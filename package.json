@@ -9,7 +9,7 @@
     "check": "tsc --noEmit",
     "build": "bun run build:ui && bun build src/index.ts --compile --outfile dist/site-crawl",
     "dev": "bun run build:ui && bun src/dev.ts",
-    "build:ui": "vite build"
+    "build:ui": "NODE_ENV=production vite build"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "1.1.23",
