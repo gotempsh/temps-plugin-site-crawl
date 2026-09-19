@@ -1,8 +1,10 @@
 /* SPDX-FileCopyrightText: 2024-2026 Temps Contributors */
 /* SPDX-License-Identifier: MIT OR Apache-2.0 */
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 @import "./vendor/ds/tokens.css";
-@source '.';
+@source './index.html';
+@source './main.tsx';
+@source './vendor';
 @custom-variant dark (&:is(.dark *));
 @theme inline {
   --color-background: var(--background);
