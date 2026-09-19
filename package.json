@@ -44,7 +44,11 @@
     "name": "site-crawl",
     "title": "Site Crawl",
     "category": "Development",
-    "entrypoint": "src/index.ts"
+    "entrypoint": "src/index.ts",
+    "platforms": [
+      "darwin-arm64",
+      "linux-amd64-gnu"
+    ]
   },
   "overrides": {
     "esbuild": "0.28.1"
